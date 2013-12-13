@@ -49,7 +49,7 @@ class Puppet::Provider::Opsview < Puppet::Provider
 
     url = [ config["url"], "config/#{@req_type.downcase}" ].join("/")
     begin
-      response = RestClient.put url, body, :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json
+      response = RestClient.put url, body, :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json, :timeout => config["timeout"]
     rescue
       @@errorOccurred = 1
       Puppet.warning "put_1: Problem sending data to Opsview server; " + $!.inspect + "\n====\n" + url + "\n====\n" + body
@@ -87,9 +87,14 @@ class Puppet::Provider::Opsview < Puppet::Provider
       raise Puppet::ParseError, "Could not parse YAML configuration file " + config_file + " " + $!.inspect
     end
 
-    if conf["username"].nil? or conf["password"].nil? or conf["url"].nil?
-      raise Puppet::ParseError, "Config file must contain URL, username, and password fields."
+    if conf["username"].nil? or conf["password"].nil? or conf["url"].nil? or conf["timeout"].nil?
+      raise Puppet::ParseError, "Config file must contain URL, username, password and timeout fields."
     end
+
+    Puppet.debug "conf(url)="+conf["url"]
+    Puppet.debug "conf(username)="+conf["username"]
+    Puppet.debug "conf(password)="+conf["password"].gsub(/\w/,'x')
+    Puppet.debug "conf(timeout)="+conf["timeout"].to_s
 
     conf
   end
@@ -109,9 +114,10 @@ class Puppet::Provider::Opsview < Puppet::Provider
                   "password" => config["password"] }.to_json
 
     url = [ config["url"], "login" ].join("/")
+    timeout = config["timeout"].to_s
 
     Puppet.debug "Using Opsview url: "+url
-    Puppet.debug "using post: username:"+config["username"]+" password:"+config["password"].gsub(/\w/,'x')
+    Puppet.debug "using post: username:"+config["username"]+" password:"+config["password"].gsub(/\w/,'x')+" timeout:"+config["timeout"].to_s
 
     if Puppet[:debug]
       Puppet.debug "Logging RestClient calls to: /tmp/puppet_restclient.log"
@@ -119,7 +125,7 @@ class Puppet::Provider::Opsview < Puppet::Provider
     end
 
     begin
-      response = RestClient.post url, post_body, :content_type => :json
+      response = RestClient.post url, post_body, :content_type => :json, :timeout => config["timeout"].to_s
     rescue
       @@errorOccurred = 1
       Puppet.warning "Problem getting token from Opsview server; " + $!.inspect
@@ -152,10 +158,10 @@ class Puppet::Provider::Opsview < Puppet::Provider
       return
     end
 
-    Puppet.notice "Performing Opsview reload"
+    Puppet.notice "Performing Opsview reload (with timeout of "+config["timeout"].to_s
 
     begin
-      response = RestClient.post url, '', :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json
+      response = RestClient.post url, '', :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json, :timeout => config["timeout"].to_s
     rescue
       @@errorOccurred = 1
       Puppet.warning "Unable to reload Opsview: " + $!.inspect
@@ -195,7 +201,7 @@ class Puppet::Provider::Opsview < Puppet::Provider
     end
 
     begin
-      response = RestClient.get url, :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json, :params => {:rows => :all}
+      response = RestClient.get url, :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json, :params => {:rows => :all}, :timeout => config["timeout"].to_s
     rescue
       @@errorOccurred = 1
       Puppet.warning "get_resource: Problem talking to Opsview server; ignoring Opsview config: " + $!.inspect
@@ -221,7 +227,7 @@ class Puppet::Provider::Opsview < Puppet::Provider
     end
 
     begin
-      response = RestClient.get url, :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json, :params => {:rows => :all}
+      response = RestClient.get url, :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json, :params => {:rows => :all}, :timeout => config["timeout"].to_s
     rescue
       @@errorOccurred = 1
       Puppet.warning "get_resource: Problem talking to Opsview server; ignoring Opsview config: " + $!.inspect
