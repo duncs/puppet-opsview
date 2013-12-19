@@ -152,30 +152,23 @@ Puppet::Type.type(:opsview_monitored).provide :opsview, :parent => Puppet::Provi
     @updated_json["name"] = @resource[:name]
     @updated_json["ip"] = @property_hash[:ip]
 
-    @updated_json["enable_snmp"] = @property_hash[:enable_snmp]
-    @updated_json["snmp_community"] = @property_hash[:snmp_community]
-    @updated_json["snmp_version"] = @property_hash[:snmp_version]
-    @updated_json["snmp_port"] = @property_hash[:snmp_port]
-    @updated_json["notification_interval"] = @property_hash[:notification_interval]
-
-    if not @property_hash[:snmpv3_authpassword].to_s.empty?
-      @updated_json["snmpv3_authpassword"] = @property_hash[:snmpv3_authpassword]
-    end
-
-    if not  @property_hash[:snmpv3_authprotocol].to_s.empty?
-      @updated_json["snmpv3_authprotocol"] = @property_hash[:snmpv3_authprotocol]
-    end
-
-    if not  @property_hash[:snmpv3_privpassword].to_s.empty?
-      @updated_json["snmpv3_privpassword"] = @property_hash[:snmpv3_privpassword]
-    end
-
-    if not  @property_hash[:snmpv3_privprotocol].to_s.empty?
-      @updated_json["snmpv3_privprotocol"] = @property_hash[:snmpv3_privprotocol]
-    end
-
-    if not  @property_hash[:snmpv3_usernamesnmpv3_authprotocol].to_s.empty?
-      @updated_json["snmpv3_username"] = @property_hash[:snmpv3_username]
+    # only overwrite the default value if a valid value is set on the new object
+    [
+	'enable_snmp',
+	'snmp_community',
+	'snmp_version',
+	'snmp_port',
+	'snmpv3_authpassword',
+	'snmpv3_authprotocol',
+	'snmpv3_privpassword',
+	'snmpv3_privprotocol',
+	'snmpv3_username',
+	'snmp_extended_throughput_data',
+	'notification_interval'
+    ].each do |property|
+	if not @property_hash[:property].to_s.empty?
+		@updated_json[property] = @property_hash[:property]
+	end
     end
 
     case @property_hash[:snmp_max_msg_size].to_s
@@ -206,10 +199,6 @@ Puppet::Type.type(:opsview_monitored).provide :opsview, :parent => Puppet::Provi
         @updated_json["tidy_ifdescr_level"] = 2
       when "level3" then
         @updated_json["tidy_ifdescr_level"] = 3
-    end
-
-    if not@property_hash[:snmp_extended_throughput_data].to_s.empty?
-      @updated_json["snmp_extended_throughput_data"] = @property_hash[:snmp_extended_throughput_data]
     end
 
     if not @property_hash[:icon_name].to_s.empty?
