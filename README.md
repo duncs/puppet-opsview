@@ -15,6 +15,7 @@ to connect with an Opsview server:
     url: http://example.com/rest
     username: foobar
     password: foobaz
+    timeout: 60
 
 Please file bugs via the issue tracker above.
 
@@ -52,3 +53,4 @@ Authors
 
 * Devon Peters &lt;devon.peters@gmail.com&gt;
 * Christian Paredes &lt;christian.paredes@sbri.org&gt;
+* Duncan Ferguson &lt;duncan.ferguson@opsview.com&gt;
