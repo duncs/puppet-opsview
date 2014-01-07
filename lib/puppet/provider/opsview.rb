@@ -150,6 +150,29 @@ class Puppet::Provider::Opsview < Puppet::Provider
     self.class.do_reload_opsview
   end
 
+  def self.get_reload_status
+    url = [ config["url"], "reload" ].join("/")
+
+    Puppet.debug "Getting Opsview reload status"
+
+    response = RestClient.get url, :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json, :timeout => config["timeout"].to_s
+
+    case response.code
+    when 200
+        # all is ok at this pount
+    when 401
+        @@errorOccurred = 1
+        raise "Login failed: " + response.code
+    else
+        @@errorOccurred = 1
+        raise "Was not able to fetch Opsview status: HTTP code: " + response.code
+    end
+	
+    Puppet.debug "Current Reload info: " + response.inspect
+    responseJson = JSON.parse(response)
+    return responseJson
+  end
+
   def self.do_reload_opsview
     url = [ config["url"], "reload" ].join("/")
 
@@ -158,26 +181,51 @@ class Puppet::Provider::Opsview < Puppet::Provider
       return
     end
 
-    Puppet.notice "Performing Opsview reload (with timeout of "+config["timeout"].to_s
+    last_reload = self.get_reload_status
 
-    begin
-      response = RestClient.post url, '', :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json, :timeout => config["timeout"].to_s
-    rescue
-      @@errorOccurred = 1
-      Puppet.warning "Unable to reload Opsview: " + $!.inspect
-      return
+    if last_reload["server_status"].to_i > 0
+        Puppet.notice "Opsview reload already in progress; continuing"
+        return
     end
 
-    case response.code
-    when 200
-      Puppet.debug "Reloaded Opsview"
-    when 401
-      raise "Login failed: " + response.code
-    when 409
-      Puppet.info "Opsview reload already in progress"
+    Puppet.debug "Last reload at: " + last_reload["lastupdated"]
+    Puppet.info "Initiating Opsview reload"
+
+    # Start the reload in a forked process, then keep fetching the current 
+    # status in the parent
+    # Do it this way as the API doesn't currently do asynchronus reloads and
+    # the rest client may time out if reloads take too long
+    fork do
+        RestClient.post url, '', :x_opsview_username => config["username"], :x_opsview_token => token, :content_type => :json, :accept => :json
+        exit
+    end
+
+    Puppet.debug "Entering polling"
+
+    end_time = Time.now.to_i+config["timeout"]
+
+    # now loop every few seconds or so to fetch the current status to see
+    # when the reload completes.  Respect the timeout if the reload takes 
+    # too long
+    loop do
+        sleep(2)
+        Puppet.debug "Polling for reload status"
+        this_reload = self.get_reload_status
+        break if this_reload["server_status"].to_i == 0 && this_reload["lastupdated"] != last_reload["lastupdated"] 
+        break if Time.now.to_i >= end_time
+    end
+    
+    # hit timeout so alert and mark error
+    if Time.now.to_i >= end_time
+        Puppet.warning "Reload did not complete within configured timeout ("+config["timeout"].to_s+" seconds)"
+        @@errorOccurred = 1
     else
-      raise "Was not able to reload Opsview: HTTP code: " + response.code
+        Puppet.info "Opsview reload completed"
     end
+
+    # reap any children
+    Puppet.debug("Reaping Opsview reload child")
+    Process.wait
   end
 
   def get_resource(name = nil)
